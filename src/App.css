@@ -308,10 +308,14 @@ body {
 }
 
 .play-phone-inline {
-  margin-top: 8px;
   display: grid;
   grid-template-columns: 1.3fr 1fr 1fr;
   gap: 8px;
+  width: 100%;
+}
+
+.play-phone-inline.in-header {
+  margin-top: 0;
 }
 
 .play-pill {
@@ -497,6 +501,62 @@ body {
   font-size: 14px;
   text-align: center;
   flex: 0 0 auto;
+}
+
+.solved-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.38);
+  display: grid;
+  place-items: center;
+  z-index: 80;
+  padding: 16px;
+}
+
+.solved-modal {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid #d3d9e0;
+  padding: 16px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+
+.solved-modal h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.solved-modal p {
+  margin: 8px 0 0;
+}
+
+.solved-difficulty-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.solved-difficulty-btn {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(31, 134, 216, 0.35);
+  background: #f3f8fe;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.solved-home-btn {
+  margin-top: 10px;
+  min-height: 44px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #c7d3df;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 700;
 }
 
 .solve-page {
@@ -964,17 +1024,19 @@ button:disabled {
     padding: 8px 8px 8px;
   }
 
-  .play-title {
-    font-size: 16px;
+  .play-page.phone .play-header-main {
+    gap: 6px;
   }
 
-  .play-subtitle {
-    font-size: 12px;
+  .play-page.phone .play-phone-inline {
+    grid-template-columns: 1.28fr 1fr 1fr;
+    gap: 6px;
   }
 
-  .play-phone-inline .play-pill {
+  .play-page.phone .play-phone-inline .play-pill {
     min-height: 34px;
-    font-size: 13px;
+    font-size: 12px;
+    padding: 4px 8px;
   }
 
   .play-main {
@@ -990,10 +1052,22 @@ button:disabled {
   .play-page.phone .play-stage-card {
     width: 100%;
     max-width: 100%;
+    padding: 0;
+    gap: 0;
   }
 
   .play-page.phone .play-board-wrap {
-    width: min(100%, 96vw);
+    width: 100%;
+    margin: 0;
+  }
+
+  .play-page.phone .play-board-wrap .grid {
+    width: 100%;
+  }
+
+  .play-page.phone .play-side {
+    padding: 8px 6px 10px;
+    gap: 10px;
   }
 
   .play-controls {

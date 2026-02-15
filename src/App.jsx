@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { difficultyList, SudokuDifficulty } from './core/SudokuDifficulty';
 import { usePlayGame } from './features/play/usePlayGame';
@@ -28,8 +28,6 @@ export default function App() {
   const [screen, setScreen] = useState('home');
   const play = usePlayGame(SudokuDifficulty.EASY);
   const solve = useSolveGame();
-  const playSolvedNotifiedRef = useRef(false);
-  const solveSolvedNotifiedRef = useRef('');
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
 
   useEffect(() => {
@@ -51,31 +49,6 @@ export default function App() {
   const playDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
   const solveKeypadLayout = isLandscape ? '3x3' : '5plus4';
   const solveDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
-
-  useEffect(() => {
-    if (screen !== 'play') return;
-    if (play.isSolvedDialog && !playSolvedNotifiedRef.current) {
-      playSolvedNotifiedRef.current = true;
-      window.alert('Puzzle solved!');
-    }
-    if (!play.isSolvedDialog) playSolvedNotifiedRef.current = false;
-  }, [screen, play.isSolvedDialog]);
-
-  useEffect(() => {
-    if (screen !== 'solve') return;
-    const solvedStatuses = [
-      'Solved.',
-      'Solved logically.',
-      'Multiple solutions exist; showing one valid completion.',
-    ];
-    const current = solve.status || '';
-    const isSolvedStatus = solvedStatuses.includes(current);
-    if (isSolvedStatus && solveSolvedNotifiedRef.current !== current) {
-      solveSolvedNotifiedRef.current = current;
-      window.alert('Puzzle solved!');
-    }
-    if (!isSolvedStatus) solveSolvedNotifiedRef.current = '';
-  }, [screen, solve.status]);
 
   if (screen === 'home') {
     return (
@@ -108,30 +81,32 @@ export default function App() {
         <header className="play-header">
           <div className="play-header-main">
             <button className="play-back" onClick={() => setScreen('home')} type="button">←</button>
-            <div>
-              <div className="play-title">Sudoku</div>
-              <div className="play-subtitle">Play mode</div>
-            </div>
+            {isPhonePortrait ? (
+              <div className="play-phone-inline in-header">
+                <label className="play-pill play-pill-select">
+                  <select
+                    value={play.difficulty?.key ?? 'EASY'}
+                    onChange={(e) => play.generate(difficultyByKey[e.target.value] ?? SudokuDifficulty.EASY)}
+                  >
+                    {difficultyList.map((d) => (
+                      <option key={d.key} value={d.key}>
+                        {starsForDifficulty(d)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="play-pill">⏱ {mmss(play.seconds)}</div>
+                <div className="play-pill">⚠ {play.mistakes}</div>
+              </div>
+            ) : (
+              <div>
+                <div className="play-title">Sudoku</div>
+                <div className="play-subtitle">Play mode</div>
+              </div>
+            )}
           </div>
 
-          {isPhonePortrait ? (
-            <div className="play-phone-inline">
-              <label className="play-pill play-pill-select">
-                <select
-                  value={play.difficulty?.key ?? 'EASY'}
-                  onChange={(e) => play.generate(difficultyByKey[e.target.value] ?? SudokuDifficulty.EASY)}
-                >
-                  {difficultyList.map((d) => (
-                    <option key={d.key} value={d.key}>
-                      {starsForDifficulty(d)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="play-pill">⏱ {mmss(play.seconds)}</div>
-              <div className="play-pill">⚠ {play.mistakes}</div>
-            </div>
-          ) : (
+          {isPhonePortrait ? null : (
             <div className="play-header-pills">
               <label className="play-pill play-pill-select">
                 <select
@@ -195,6 +170,31 @@ export default function App() {
               />
             </div>
           </div>
+
+          {play.isSolvedDialog ? (
+            <div className="solved-modal-backdrop">
+              <div className="solved-modal">
+                <h2>Congrats</h2>
+                <p>Completed in {mmss(play.seconds)}.</p>
+                <p>Select difficulty for a new game:</p>
+                <div className="solved-difficulty-grid">
+                  {difficultyList.map((d) => (
+                    <button
+                      key={d.key}
+                      className="solved-difficulty-btn"
+                      onClick={() => play.generate(d)}
+                      type="button"
+                    >
+                      {starsForDifficulty(d)}
+                    </button>
+                  ))}
+                </div>
+                <button className="solved-home-btn" onClick={() => setScreen('home')} type="button">
+                  Back to Home
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {!isPhonePortrait ? (
             <div className="play-status">{play.loading ? 'Generating puzzle...' : play.status || 'Ready'}</div>
