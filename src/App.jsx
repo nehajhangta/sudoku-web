@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { difficultyList, SudokuDifficulty } from './core/SudokuDifficulty';
 import { usePlayGame } from './features/play/usePlayGame';
@@ -6,6 +6,7 @@ import { useSolveGame } from './features/solve/useSolveGame';
 import { SudokuGrid } from './components/SudokuGrid';
 import { Keypad } from './components/Keypad';
 import { HomeScreen } from './screens/HomeScreen';
+import { RulesScreen } from './screens/RulesScreen';
 
 function mmss(seconds) {
   const m = String(Math.floor(seconds / 60)).padStart(2, '0');
@@ -27,6 +28,8 @@ export default function App() {
   const [screen, setScreen] = useState('home');
   const play = usePlayGame(SudokuDifficulty.EASY);
   const solve = useSolveGame();
+  const playSolvedNotifiedRef = useRef(false);
+  const solveSolvedNotifiedRef = useRef('');
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
 
   useEffect(() => {
@@ -42,11 +45,37 @@ export default function App() {
   const isLandscape = viewport.w > viewport.h;
   const isTablet = Math.min(viewport.w, viewport.h) >= 520;
   const isPhonePortrait = !isTablet && !isLandscape;
+  const isPhoneLandscape = !isTablet && isLandscape;
   const isTabletLandscape = isTablet && isLandscape;
   const playKeypadLayout = isTabletLandscape ? '3x3' : '5plus4';
   const playDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
   const solveKeypadLayout = isLandscape ? '3x3' : '5plus4';
   const solveDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
+
+  useEffect(() => {
+    if (screen !== 'play') return;
+    if (play.isSolvedDialog && !playSolvedNotifiedRef.current) {
+      playSolvedNotifiedRef.current = true;
+      window.alert('Puzzle solved!');
+    }
+    if (!play.isSolvedDialog) playSolvedNotifiedRef.current = false;
+  }, [screen, play.isSolvedDialog]);
+
+  useEffect(() => {
+    if (screen !== 'solve') return;
+    const solvedStatuses = [
+      'Solved.',
+      'Solved logically.',
+      'Multiple solutions exist; showing one valid completion.',
+    ];
+    const current = solve.status || '';
+    const isSolvedStatus = solvedStatuses.includes(current);
+    if (isSolvedStatus && solveSolvedNotifiedRef.current !== current) {
+      solveSolvedNotifiedRef.current = current;
+      window.alert('Puzzle solved!');
+    }
+    if (!isSolvedStatus) solveSolvedNotifiedRef.current = '';
+  }, [screen, solve.status]);
 
   if (screen === 'home') {
     return (
@@ -56,12 +85,24 @@ export default function App() {
           play.generate(difficulty);
         }}
         onOpenSolve={() => setScreen('solve')}
-        onHowToPlay={() => window.alert('Sudoku rules screen will be added next.')}
+        onHowToPlay={() => setScreen('rules')}
       />
     );
   }
 
+  if (screen === 'rules') {
+    return <RulesScreen onBack={() => setScreen('home')} />;
+  }
+
   if (screen === 'play') {
+    if (isPhoneLandscape) {
+      return (
+        <div className="rotate-lock">
+          <p>Rotate to portrait mode to play.</p>
+        </div>
+      );
+    }
+
     return (
       <div className={`play-page ${playDeviceClass}`}>
         <header className="play-header">
@@ -73,29 +114,43 @@ export default function App() {
             </div>
           </div>
 
-          <div className={`play-header-pills ${isPhonePortrait ? 'phone' : ''}`}>
-            <label className="play-pill play-pill-select">
-              <select
-                value={play.difficulty?.key ?? 'EASY'}
-                onChange={(e) => play.generate(difficultyByKey[e.target.value] ?? SudokuDifficulty.EASY)}
-              >
-                {difficultyList.map((d) => (
-                  <option key={d.key} value={d.key}>
-                    {starsForDifficulty(d)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {!isPhonePortrait ? (
+          {isPhonePortrait ? (
+            <div className="play-phone-inline">
+              <label className="play-pill play-pill-select">
+                <select
+                  value={play.difficulty?.key ?? 'EASY'}
+                  onChange={(e) => play.generate(difficultyByKey[e.target.value] ?? SudokuDifficulty.EASY)}
+                >
+                  {difficultyList.map((d) => (
+                    <option key={d.key} value={d.key}>
+                      {starsForDifficulty(d)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="play-pill">⏱ {mmss(play.seconds)}</div>
+              <div className="play-pill">⚠ {play.mistakes}</div>
+            </div>
+          ) : (
+            <div className="play-header-pills">
+              <label className="play-pill play-pill-select">
+                <select
+                  value={play.difficulty?.key ?? 'EASY'}
+                  onChange={(e) => play.generate(difficultyByKey[e.target.value] ?? SudokuDifficulty.EASY)}
+                >
+                  {difficultyList.map((d) => (
+                    <option key={d.key} value={d.key}>
+                      {starsForDifficulty(d)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="play-pill">ID: {play.puzzleId}</div>
-            ) : null}
-            <div className="play-pill">{isPhonePortrait ? '⚠' : 'Mistakes:'} {play.mistakes}</div>
-            <div className="play-pill">{isPhonePortrait ? '⏱' : 'Time:'} {mmss(play.seconds)}</div>
-            {!isPhonePortrait ? (
+              <div className="play-pill">Mistakes: {play.mistakes}</div>
+              <div className="play-pill">Time: {mmss(play.seconds)}</div>
               <button className="play-pill play-pill-btn" onClick={() => play.generate(play.difficulty)} type="button">New</button>
-            ) : null}
-          </div>
+            </div>
+          )}
         </header>
 
         <main className="play-main">
@@ -141,14 +196,18 @@ export default function App() {
             </div>
           </div>
 
-          {isPhonePortrait ? (
-            <div className="play-phone-new">
-              <button className="play-pill play-pill-btn" onClick={() => play.generate(play.difficulty)} type="button">New</button>
-            </div>
+          {!isPhonePortrait ? (
+            <div className="play-status">{play.loading ? 'Generating puzzle...' : play.status || 'Ready'}</div>
           ) : null}
-
-          <div className="play-status">{play.loading ? 'Generating puzzle...' : play.status || 'Ready'}</div>
         </main>
+      </div>
+    );
+  }
+
+  if (screen === 'solve' && isPhoneLandscape) {
+    return (
+      <div className="rotate-lock">
+        <p>Rotate to portrait mode to use solver.</p>
       </div>
     );
   }
