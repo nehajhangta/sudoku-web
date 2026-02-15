@@ -799,8 +799,12 @@ body {
 }
 
 .cell .cell-value {
-  font-size: clamp(18px, 2.4vw, 26px);
-  text-shadow: 0 0 0 rgba(0, 0, 0, 0.35);
+  font-family: "Noto Sans", "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  text-shadow: none;
+  font-size: 26px;
 }
 
 .cell .cell-marks {
@@ -993,6 +997,10 @@ button:disabled {
     width: 72px;
     height: 72px;
     font-size: 26px;
+  }
+
+  .cell .cell-value {
+    font-size: 24px;
   }
 }
 
@@ -1226,6 +1234,10 @@ button:disabled {
 
   .solve-steps-log {
     max-height: 72px;
+  }
+
+  .cell .cell-value {
+    font-size: 21px;
   }
 }
 
