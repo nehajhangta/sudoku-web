@@ -225,6 +225,7 @@ export function useSolveGame() {
     pencilMode,
     currentReason,
     stepIndex,
+    logicalSteps,
     totalSteps: logicalSteps.length,
     isGeneratingSteps,
     setSelectedIdx,

@@ -28,6 +28,7 @@ export default function App() {
   const [screen, setScreen] = useState('home');
   const play = usePlayGame(SudokuDifficulty.EASY);
   const solve = useSolveGame();
+  const [showSolveSteps, setShowSolveSteps] = useState(false);
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
 
   useEffect(() => {
@@ -49,6 +50,13 @@ export default function App() {
   const playDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
   const solveKeypadLayout = isLandscape ? '3x3' : '5plus4';
   const solveDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
+  const solveAppliedReasons = (solve.logicalSteps ?? []).slice(0, solve.stepIndex).map((s) => s.reason);
+  const solvePrimaryMessage = solve.status || 'Enter puzzle first.';
+
+  useEffect(() => {
+    if (screen !== 'solve') return;
+    if (solve.stepIndex === 0) setShowSolveSteps(false);
+  }, [screen, solve.stepIndex]);
 
   if (screen === 'home') {
     return (
@@ -263,15 +271,30 @@ export default function App() {
               <button className="solve-action-btn" onClick={solve.solveNow} type="button">Solution</button>
               <button className="solve-action-btn" onClick={solve.stepByStep} disabled={solve.isGeneratingSteps} type="button">Step-by-step</button>
             </div>
+
+            <div className="solve-message-board">
+              <div className="solve-message-line">{solvePrimaryMessage}</div>
+              {solveAppliedReasons.length > 0 ? (
+                <>
+                  <button
+                    className="solve-steps-toggle"
+                    onClick={() => setShowSolveSteps((v) => !v)}
+                    type="button"
+                  >
+                    {showSolveSteps ? 'Hide steps' : `Show steps (${solveAppliedReasons.length})`}
+                  </button>
+                  {showSolveSteps ? (
+                    <div className="solve-steps-log">
+                      {solveAppliedReasons.map((reason, idx) => (
+                        <div key={`${idx}-${reason}`}>Step {idx + 1}: {reason}</div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
-
-        {(solve.currentReason || solve.status) ? (
-          <div className="solve-notes">
-            {solve.currentReason ? <div>Reason: {solve.currentReason}</div> : null}
-            {solve.status ? <div>{solve.status}</div> : null}
-          </div>
-        ) : null}
       </main>
     </div>
   );
