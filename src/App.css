@@ -1127,12 +1127,26 @@ button:disabled {
   }
 
   .solve-page.phone .solve-stage-card {
-    width: 100%;
+    width: min(100%, calc(100dvw - 10px));
     max-width: 100%;
+    padding: 0;
+    gap: 0;
+    max-height: calc(100dvh - 86px);
+    overflow-y: auto;
   }
 
   .solve-page.phone .solve-board-wrap {
-    width: min(100%, 96vw);
+    width: 100%;
+    margin: 0;
+  }
+
+  .solve-page.phone .solve-board-wrap .grid {
+    width: 100%;
+  }
+
+  .solve-page.phone .solve-side {
+    padding: 8px 6px 10px;
+    gap: 10px;
   }
 
   .solve-controls {
@@ -1168,6 +1182,10 @@ button:disabled {
   .solve-action-btn {
     min-height: 42px;
     font-size: 13px;
+  }
+
+  .solve-page.phone .solve-actions {
+    width: 100%;
   }
 }
 
