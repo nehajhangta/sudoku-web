@@ -564,7 +564,7 @@ body {
   background: #f4f6f8;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .solve-header {
@@ -608,7 +608,7 @@ body {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .solve-stage-card {
@@ -1158,8 +1158,8 @@ button:disabled {
     max-width: 100%;
     padding: 0;
     gap: 0;
-    max-height: calc(100dvh - 86px);
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
   }
 
   .solve-page.phone .solve-board-wrap {
@@ -1213,6 +1213,11 @@ button:disabled {
 
   .solve-page.phone .solve-actions {
     width: 100%;
+  }
+
+  .solve-page.phone .solve-main {
+    overflow-y: auto;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .solve-message-board {
