@@ -52,6 +52,10 @@ function toWholeSeconds(ms) {
   return Math.max(0, Math.round(ms / 1000));
 }
 
+function hasPlayableSavedState(state) {
+  return Boolean(state?.hasStarted);
+}
+
 function isSolved(board, solution) {
   for (let row = 0; row < 9; row += 1) {
     for (let col = 0; col < 9; col += 1) {
@@ -163,7 +167,7 @@ export function usePlayGame(initialDifficulty) {
   const [isSolvedDialog, setIsSolvedDialog] = useState(false);
   const [pencilMarks, setPencilMarks] = useState(() => Array.from({ length: 81 }, () => new Set()));
   const [puzzleId, setPuzzleId] = useState('------');
-  const [hasSavedGame, setHasSavedGame] = useState(() => Boolean(loadPlayState()));
+  const [hasSavedGame, setHasSavedGame] = useState(() => hasPlayableSavedState(loadPlayState()));
 
   const timerRef = useRef(null);
   const generator = useMemo(() => new SudokuGenerator(), []);
@@ -298,7 +302,7 @@ export function usePlayGame(initialDifficulty) {
 
   const restoreSavedGame = () => {
     const saved = loadPlayState();
-    if (!saved) {
+    if (!hasPlayableSavedState(saved)) {
       setHasSavedGame(false);
       return false;
     }
@@ -350,7 +354,7 @@ export function usePlayGame(initialDifficulty) {
   };
 
   const persistedPayload = useMemo(() => {
-    if (!board || !solution || loading || isSolvedDialog) return null;
+    if (!board || !solution || loading || isSolvedDialog || !hasStarted) return null;
     const elapsedSeconds = Math.max(0, Math.round(seconds));
     const elapsedMs = elapsedSeconds * 1000;
     const wasTimerRunning = Boolean(hasStarted && !isPaused && !loading && isViewActive);
@@ -400,6 +404,12 @@ export function usePlayGame(initialDifficulty) {
   useEffect(() => {
     persistSnapshotRef.current = persistedPayload;
   }, [persistedPayload]);
+
+  useEffect(() => {
+    if (hasStarted || isSolvedDialog) return;
+    clearPlayState();
+    setHasSavedGame(false);
+  }, [hasStarted, isSolvedDialog]);
 
   useEffect(() => {
     if (!persistedPayload) return;

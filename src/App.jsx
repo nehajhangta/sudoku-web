@@ -121,7 +121,7 @@ export default function App() {
               <p>Your previous Play mode game is saved.</p>
               <div className="resume-modal-actions">
                 <button
-                  className="solved-difficulty-btn"
+                  className="solved-home-btn leave-home-btn"
                   onClick={() => {
                     setShowResumePrompt(false);
                     setScreen('play');
@@ -308,7 +308,7 @@ export default function App() {
                 <p>Your progress is saved.</p>
                 <div className="resume-modal-actions">
                   <button
-                    className="solved-difficulty-btn"
+                    className="solved-home-btn leave-home-btn"
                     onClick={() => setShowLeavePrompt(false)}
                     type="button"
                   >
