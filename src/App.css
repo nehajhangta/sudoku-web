@@ -542,10 +542,16 @@ body {
 .solved-difficulty-btn {
   min-height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(31, 134, 216, 0.35);
-  background: #f3f8fe;
-  color: #0f172a;
+  border: none;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
   font-weight: 700;
+}
+
+.solved-difficulty-grid .solved-difficulty-btn:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(220px, 100%);
 }
 
 .solved-home-btn {
@@ -557,6 +563,24 @@ body {
   background: #fff;
   color: #0f172a;
   font-weight: 700;
+}
+
+.resume-modal-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.leave-home-btn {
+  margin-top: 0;
+}
+
+.resume-modal-actions .solved-difficulty-btn,
+.resume-modal-actions .solved-home-btn {
+  min-height: 42px;
+  margin-top: 0;
+  width: 100%;
 }
 
 .solve-page {

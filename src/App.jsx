@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { difficultyList, SudokuDifficulty } from './core/SudokuDifficulty';
 import { usePlayGame } from './features/play/usePlayGame';
@@ -29,7 +29,12 @@ export default function App() {
   const play = usePlayGame(SudokuDifficulty.EASY);
   const solve = useSolveGame();
   const [showSolveSteps, setShowSolveSteps] = useState(false);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const [pendingDifficulty, setPendingDifficulty] = useState(null);
+  const [showLeavePrompt, setShowLeavePrompt] = useState(false);
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const shouldGuardBackRef = useRef(false);
+  const hasBackGuardRef = useRef(false);
 
   useEffect(() => {
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -52,22 +57,110 @@ export default function App() {
   const solveDeviceClass = isTabletLandscape ? 'tablet-landscape' : (isTablet ? 'tablet-portrait' : 'phone');
   const solveAppliedReasons = (solve.logicalSteps ?? []).slice(0, solve.stepIndex).map((s) => s.reason);
   const solvePrimaryMessage = solve.status || 'Enter puzzle first.';
+  const shouldGuardBack = screen === 'play' && Boolean(play.board) && play.hasStarted && !play.isSolvedDialog;
+  const handlePlayBack = () => {
+    if (shouldGuardBack) {
+      setShowLeavePrompt(true);
+      return;
+    }
+    setScreen('home');
+  };
 
   useEffect(() => {
     if (screen !== 'solve') return;
     if (solve.stepIndex === 0) setShowSolveSteps(false);
   }, [screen, solve.stepIndex]);
 
+  useEffect(() => {
+    play.setViewActive(screen === 'play');
+  }, [screen]);
+
+  useEffect(() => {
+    shouldGuardBackRef.current = shouldGuardBack;
+    if (!shouldGuardBack) {
+      hasBackGuardRef.current = false;
+      return;
+    }
+    if (!hasBackGuardRef.current) {
+      window.history.pushState({ grid81PlayGuard: true }, '');
+      hasBackGuardRef.current = true;
+    }
+  }, [shouldGuardBack]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (!shouldGuardBackRef.current) return;
+      setShowLeavePrompt(true);
+      window.history.pushState({ grid81PlayGuard: true }, '');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   if (screen === 'home') {
     return (
-      <HomeScreen
-        onStartPlay={(difficulty) => {
-          setScreen('play');
-          play.generate(difficulty);
-        }}
-        onOpenSolve={() => setScreen('solve')}
-        onHowToPlay={() => setScreen('rules')}
-      />
+      <>
+        <HomeScreen
+          onStartPlay={(difficulty) => {
+            if (play.hasSavedGame) {
+              setPendingDifficulty(difficulty);
+              setShowResumePrompt(true);
+              return;
+            }
+            setScreen('play');
+            play.generate(difficulty);
+          }}
+          onOpenSolve={() => setScreen('solve')}
+          onHowToPlay={() => setScreen('rules')}
+        />
+
+        {showResumePrompt ? (
+          <div className="solved-modal-backdrop">
+            <div className="solved-modal">
+              <h2>Resume game?</h2>
+              <p>Your previous Play mode game is saved.</p>
+              <div className="resume-modal-actions">
+                <button
+                  className="solved-difficulty-btn"
+                  onClick={() => {
+                    setShowResumePrompt(false);
+                    setScreen('play');
+                    const restored = play.restoreSavedGame();
+                    if (!restored) play.generate(pendingDifficulty ?? SudokuDifficulty.EASY);
+                    setPendingDifficulty(null);
+                  }}
+                  type="button"
+                >
+                  Resume
+                </button>
+                <button
+                  className="solved-home-btn"
+                  onClick={() => {
+                    setShowResumePrompt(false);
+                    play.discardSavedGame();
+                    setScreen('play');
+                    play.generate(pendingDifficulty ?? SudokuDifficulty.EASY);
+                    setPendingDifficulty(null);
+                  }}
+                  type="button"
+                >
+                  Start new
+                </button>
+              </div>
+              <button
+                className="solved-home-btn"
+                onClick={() => {
+                  setShowResumePrompt(false);
+                  setPendingDifficulty(null);
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </>
     );
   }
 
@@ -88,7 +181,7 @@ export default function App() {
       <div className={`play-page ${playDeviceClass}`}>
         <header className="play-header">
           <div className="play-header-main">
-            <button className="play-back" onClick={() => setScreen('home')} type="button">←</button>
+            <button className="play-back" onClick={handlePlayBack} type="button">←</button>
             {isPhonePortrait ? (
               <div className="play-phone-inline in-header">
                 <label className="play-pill play-pill-select">
@@ -189,7 +282,7 @@ export default function App() {
                   {difficultyList.map((d) => (
                     <button
                       key={d.key}
-                      className="solved-difficulty-btn"
+                      className={`solved-difficulty-btn diff-${d.key.toLowerCase()}`}
                       onClick={() => play.generate(d)}
                       type="button"
                     >
@@ -206,6 +299,34 @@ export default function App() {
 
           {!isPhonePortrait ? (
             <div className="play-status">{play.loading ? 'Generating puzzle...' : play.status || 'Ready'}</div>
+          ) : null}
+
+          {showLeavePrompt ? (
+            <div className="solved-modal-backdrop">
+              <div className="solved-modal">
+                <h2>Leave game?</h2>
+                <p>Your progress is saved.</p>
+                <div className="resume-modal-actions">
+                  <button
+                    className="solved-difficulty-btn"
+                    onClick={() => setShowLeavePrompt(false)}
+                    type="button"
+                  >
+                    Stay
+                  </button>
+                  <button
+                    className="solved-home-btn leave-home-btn"
+                    onClick={() => {
+                      setShowLeavePrompt(false);
+                      setScreen('home');
+                    }}
+                    type="button"
+                  >
+                    Leave
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : null}
         </main>
       </div>

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SudokuGenerator } from '../../core/SudokuGenerator';
 import { SudokuRules } from '../../core/SudokuRules';
+import { SudokuBoard } from '../../core/SudokuBoard';
+import { SudokuDifficulty } from '../../core/SudokuDifficulty';
+import { clearPlayState, loadPlayState, savePlayState } from '../../core/persist';
 
 function idxToRC(idx) {
   return { row: Math.floor(idx / 9), col: idx % 9 };
@@ -12,6 +15,41 @@ function boardToList(board) {
     for (let col = 0; col < 9; col += 1) out.push(board.get(row, col));
   }
   return out;
+}
+
+function listToBoard(values) {
+  if (!Array.isArray(values) || values.length !== 81) return null;
+  const rows = [];
+  for (let row = 0; row < 9; row += 1) {
+    const rowValues = [];
+    for (let col = 0; col < 9; col += 1) {
+      const value = values[row * 9 + col];
+      if (!Number.isInteger(value) || value < 0 || value > 9) return null;
+      rowValues.push(value);
+    }
+    rows.push(rowValues);
+  }
+  return new SudokuBoard(rows);
+}
+
+function normalizeGivensMask(mask) {
+  if (!Array.isArray(mask) || mask.length !== 81) return Array(81).fill(false);
+  return mask.map((v) => Boolean(v));
+}
+
+function normalizePencilMarks(marks) {
+  if (!Array.isArray(marks) || marks.length !== 81) return Array.from({ length: 81 }, () => new Set());
+  return marks.map((entry) => new Set(Array.isArray(entry) ? entry.filter((v) => Number.isInteger(v) && v >= 1 && v <= 9) : []));
+}
+
+function difficultyFromKey(key, fallback) {
+  if (!key || !Object.prototype.hasOwnProperty.call(SudokuDifficulty, key)) return fallback;
+  return SudokuDifficulty[key];
+}
+
+function toWholeSeconds(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return 0;
+  return Math.max(0, Math.round(ms / 1000));
 }
 
 function isSolved(board, solution) {
@@ -121,12 +159,15 @@ export function usePlayGame(initialDifficulty) {
   const [conflictCells, setConflictCells] = useState(() => new Set());
   const [hasStarted, setHasStarted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isViewActive, setIsViewActive] = useState(true);
   const [isSolvedDialog, setIsSolvedDialog] = useState(false);
   const [pencilMarks, setPencilMarks] = useState(() => Array.from({ length: 81 }, () => new Set()));
   const [puzzleId, setPuzzleId] = useState('------');
+  const [hasSavedGame, setHasSavedGame] = useState(() => Boolean(loadPlayState()));
 
   const timerRef = useRef(null);
   const generator = useMemo(() => new SudokuGenerator(), []);
+  const persistSnapshotRef = useRef(null);
 
   const stopTimer = () => {
     if (timerRef.current) {
@@ -136,8 +177,16 @@ export function usePlayGame(initialDifficulty) {
   };
 
   const syncTimer = (nextState) => {
+    const mergedState = {
+      hasStarted,
+      isPaused,
+      isSolvedDialog,
+      loading,
+      isViewActive,
+      ...nextState,
+    };
     stopTimer();
-    if (!nextState.hasStarted || nextState.isPaused || nextState.isSolvedDialog || nextState.loading) return;
+    if (!mergedState.hasStarted || mergedState.isPaused || mergedState.isSolvedDialog || mergedState.loading || !mergedState.isViewActive) return;
     timerRef.current = setInterval(() => setSeconds((v) => v + 1), 1000);
   };
 
@@ -162,6 +211,8 @@ export function usePlayGame(initialDifficulty) {
     setShowErrors(true);
     setStrictMode(false);
     setPencilMarks(Array.from({ length: 81 }, () => new Set()));
+    clearPlayState();
+    setHasSavedGame(false);
     stopTimer();
 
     setTimeout(() => {
@@ -193,7 +244,7 @@ export function usePlayGame(initialDifficulty) {
         return next;
       });
       setStatus('');
-      syncTimer({ hasStarted: true, isPaused, isSolvedDialog, loading });
+      syncTimer({ hasStarted: true, isPaused, isSolvedDialog, loading, isViewActive });
       return;
     }
 
@@ -222,7 +273,7 @@ export function usePlayGame(initialDifficulty) {
     setStatus(solved ? 'Solved.' : '');
 
     const nextHasStarted = hasStarted || value !== 0;
-    syncTimer({ hasStarted: nextHasStarted, isPaused, isSolvedDialog: solved, loading: false });
+    syncTimer({ hasStarted: nextHasStarted, isPaused, isSolvedDialog: solved, loading: false, isViewActive });
   };
 
   const clearCell = () => {
@@ -237,13 +288,150 @@ export function usePlayGame(initialDifficulty) {
     if (!hasStarted || isSolvedDialog) return;
     const nextPaused = !isPaused;
     setIsPaused(nextPaused);
-    syncTimer({ hasStarted, isPaused: nextPaused, isSolvedDialog, loading });
+    syncTimer({ hasStarted, isPaused: nextPaused, isSolvedDialog, loading, isViewActive });
   };
 
   useEffect(() => {
-    syncTimer({ hasStarted, isPaused, isSolvedDialog, loading });
+    syncTimer({ hasStarted, isPaused, isSolvedDialog, loading, isViewActive });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasStarted, isPaused, isSolvedDialog, loading]);
+  }, [hasStarted, isPaused, isSolvedDialog, loading, isViewActive]);
+
+  const restoreSavedGame = () => {
+    const saved = loadPlayState();
+    if (!saved) {
+      setHasSavedGame(false);
+      return false;
+    }
+
+    const restoredBoard = listToBoard(saved.board);
+    const restoredSolution = listToBoard(saved.solution);
+    if (!restoredBoard || !restoredSolution) {
+      clearPlayState();
+      setHasSavedGame(false);
+      return false;
+    }
+
+    const restoredDifficulty = difficultyFromKey(saved.difficultyKey, initialDifficulty);
+    const elapsedMsBase = Number.isFinite(saved.elapsedMs) && saved.elapsedMs >= 0 ? saved.elapsedMs : 0;
+    const savedWholeSeconds = Number.isInteger(saved.elapsedSeconds) && saved.elapsedSeconds >= 0
+      ? saved.elapsedSeconds
+      : toWholeSeconds(elapsedMsBase);
+    const wasTimerRunning = Boolean(saved.wasTimerRunning);
+    const savedAt = Number.isFinite(saved.savedAt) ? saved.savedAt : Date.now();
+    const deltaSeconds = wasTimerRunning ? toWholeSeconds(Math.max(0, Date.now() - savedAt)) : 0;
+    const restoredSeconds = savedWholeSeconds + deltaSeconds;
+
+    stopTimer();
+    setDifficulty(restoredDifficulty);
+    setBoard(restoredBoard);
+    setSolution(restoredSolution);
+    setGivensMask(normalizeGivensMask(saved.givensMask));
+    setSelectedIdx(Number.isInteger(saved.selectedIdx) && saved.selectedIdx >= 0 && saved.selectedIdx < 81 ? saved.selectedIdx : null);
+    setLoading(false);
+    setStatus(typeof saved.status === 'string' ? saved.status : '');
+    setSeconds(restoredSeconds);
+    setMistakes(Number.isInteger(saved.mistakes) && saved.mistakes >= 0 ? saved.mistakes : 0);
+    setIsPencilMode(Boolean(saved.isPencilMode));
+    setShowErrors(saved.showErrors !== false);
+    setStrictMode(Boolean(saved.strictMode));
+    setHasStarted(Boolean(saved.hasStarted));
+    setIsPaused(Boolean(saved.isPaused));
+    setIsSolvedDialog(false);
+    setPencilMarks(normalizePencilMarks(saved.pencilMarks));
+    setPuzzleId(typeof saved.puzzleId === 'string' && saved.puzzleId ? saved.puzzleId : makePuzzleId(restoredBoard, restoredDifficulty));
+    setConflictCells(new Set());
+    setHasSavedGame(true);
+    return true;
+  };
+
+  const discardSavedGame = () => {
+    clearPlayState();
+    setHasSavedGame(false);
+  };
+
+  const persistedPayload = useMemo(() => {
+    if (!board || !solution || loading || isSolvedDialog) return null;
+    const elapsedSeconds = Math.max(0, Math.round(seconds));
+    const elapsedMs = elapsedSeconds * 1000;
+    const wasTimerRunning = Boolean(hasStarted && !isPaused && !loading && isViewActive);
+    return {
+      difficultyKey: difficulty?.key ?? initialDifficulty?.key ?? 'EASY',
+      board: boardToList(board),
+      solution: boardToList(solution),
+      givensMask: givensMask.slice(),
+      pencilMarks: pencilMarks.map((marks) => Array.from(marks).sort((a, b) => a - b)),
+      selectedIdx,
+      seconds: elapsedSeconds,
+      elapsedSeconds,
+      elapsedMs,
+      mistakes,
+      isPencilMode,
+      showErrors,
+      strictMode,
+      hasStarted,
+      isPaused,
+      status,
+      puzzleId,
+      wasTimerRunning,
+      savedAt: Date.now(),
+    };
+  }, [
+    board,
+    solution,
+    loading,
+    isSolvedDialog,
+    seconds,
+    hasStarted,
+    isPaused,
+    difficulty,
+    initialDifficulty,
+    givensMask,
+    pencilMarks,
+    selectedIdx,
+    mistakes,
+    isPencilMode,
+    showErrors,
+    strictMode,
+    status,
+    puzzleId,
+    isViewActive,
+  ]);
+
+  useEffect(() => {
+    persistSnapshotRef.current = persistedPayload;
+  }, [persistedPayload]);
+
+  useEffect(() => {
+    if (!persistedPayload) return;
+    const timeoutId = setTimeout(() => {
+      savePlayState(persistedPayload);
+      setHasSavedGame(true);
+    }, 200);
+    return () => clearTimeout(timeoutId);
+  }, [persistedPayload]);
+
+  useEffect(() => {
+    const flushPersist = () => {
+      if (!persistSnapshotRef.current) return;
+      savePlayState(persistSnapshotRef.current);
+      setHasSavedGame(true);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushPersist();
+    };
+    window.addEventListener('beforeunload', flushPersist);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', flushPersist);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSolvedDialog) return;
+    clearPlayState();
+    setHasSavedGame(false);
+  }, [isSolvedDialog]);
 
   return {
     difficulty,
@@ -260,11 +448,16 @@ export function usePlayGame(initialDifficulty) {
     conflictCells,
     hasStarted,
     isPaused,
+    isViewActive,
     isSolvedDialog,
     pencilMarks,
     puzzleId,
+    hasSavedGame,
     setSelectedIdx,
     generate,
+    restoreSavedGame,
+    discardSavedGame,
+    setViewActive: (active) => setIsViewActive(Boolean(active)),
     input,
     clearCell,
     togglePencilMode,
